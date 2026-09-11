@@ -36,6 +36,22 @@ DaemonSets in `harvester-system` and read their pod logs:
 ./harvester-precheck --kubeconfig /path/to/kubeconfig
 ```
 
+By default every registered check runs. To run a selected, comma-separated set
+of checks, use their registry IDs; whitespace is ignored and the report always
+uses registry order:
+
+```console
+./harvester-precheck --kubeconfig /path/to/kubeconfig \
+  --checks=node-status,pod-status --output=json
+```
+
+Discover the available IDs without a kubeconfig or cluster connection:
+
+```console
+./harvester-precheck --list-checks
+./harvester-precheck --list-checks --output=json
+```
+
 The standard `KUBECONFIG` and current-context loading rules apply when the flags
 are omitted. The command can run from any machine with API access; it does not
 need to run on a control-plane node.
@@ -50,7 +66,20 @@ Usage: harvester-precheck [options]
       --timeout DURATION    timeout for each node validator (default 5m)
       --validator-image REF override the compiled-in validator image
       --output text|json    select the report format (default text)
+      --checks ID[,ID...]   run only the selected checks (default: all)
+      --list-checks         list check IDs, scopes, and display names offline
 ```
+
+Valid check IDs are `certificates`, `node-free-space`, `helm-bundles`,
+`harvester-bundle`, `node-status`, `capi-cluster-state`,
+`capi-cluster-pause`, `capi-machine-count`, `capi-machine-state`,
+`longhorn-volume-health`, `stale-longhorn-volumes`,
+`longhorn-backing-images`, `image-volume-size`, `virtual-machines`,
+`pod-status`, `kubeconfig-secret`, `backup-target`, `storage-network-ip`,
+`rwx-network-ip`, `network-config`, and `cos-state-size`.
+
+`--checks` rejects unknown or empty IDs and cannot be combined with
+`--list-checks`.
 
 An existing log file is only overwritten after an interactive confirmation or
 when `--yes` is set. Non-interactive runs must use `--yes` explicitly.

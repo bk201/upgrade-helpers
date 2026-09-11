@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,5 +54,56 @@ func TestPrepareLogRequiresYesWhenNonInteractive(t *testing.T) {
 	}
 	if string(data) != "new" {
 		t.Fatalf("got %q", data)
+	}
+}
+
+func TestCheckSelectionValidationHappensBeforeKubeconfig(t *testing.T) {
+	var output, stderr bytes.Buffer
+	if got := run([]string{"--kubeconfig", filepath.Join(t.TempDir(), "does-not-exist"), "--checks", "not-a-check"}, strings.NewReader(""), &output, &stderr); got != 2 {
+		t.Fatalf("got exit %d, want 2; stderr=%s", got, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "unknown check ID") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestCheckSelectionUsageErrors(t *testing.T) {
+	tests := [][]string{
+		{"--checks", "node-status,"},
+		{"--checks", ""},
+		{"--checks", "node-status", "--list-checks"},
+	}
+	for _, args := range tests {
+		var output, stderr bytes.Buffer
+		if got := run(args, strings.NewReader(""), &output, &stderr); got != 2 {
+			t.Fatalf("args %v: got exit %d, want 2; stderr=%s", args, got, stderr.String())
+		}
+	}
+}
+
+func TestListChecksWorksOffline(t *testing.T) {
+	var output, stderr bytes.Buffer
+	if got := run([]string{"--list-checks"}, strings.NewReader(""), &output, &stderr); got != 0 {
+		t.Fatalf("got exit %d, want 0; stderr=%s", got, stderr.String())
+	}
+	if !strings.Contains(output.String(), "ID                       SCOPE    DISPLAY NAME") || !strings.Contains(output.String(), "node-status              cluster  Node Status") {
+		t.Fatalf("unexpected listing: %q", output.String())
+	}
+
+	output.Reset()
+	if got := run([]string{"--list-checks", "--output=json"}, strings.NewReader(""), &output, &stderr); got != 0 {
+		t.Fatalf("JSON listing exit %d; stderr=%s", got, stderr.String())
+	}
+	var listing struct {
+		SchemaVersion string `json:"schemaVersion"`
+		Checks        []struct {
+			ID string `json:"id"`
+		} `json:"checks"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &listing); err != nil {
+		t.Fatal(err)
+	}
+	if listing.SchemaVersion != "v1" || len(listing.Checks) == 0 || listing.Checks[0].ID != "certificates" {
+		t.Fatalf("unexpected JSON listing: %+v", listing)
 	}
 }

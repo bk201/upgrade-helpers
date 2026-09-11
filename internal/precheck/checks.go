@@ -35,9 +35,12 @@ func Registry() []Check {
 	}
 }
 
-func Run(ctx context.Context, env *Environment) Report {
+func Run(ctx context.Context, env *Environment, selected []Check) Report {
 	started := time.Now().UTC()
-	checks := Registry()
+	checks := selected
+	if checks == nil {
+		checks = Registry()
+	}
 	results := make([]Result, len(checks))
 	group, groupContext := errgroup.WithContext(ctx)
 	group.SetLimit(4)

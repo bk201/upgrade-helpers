@@ -11,6 +11,11 @@ each result to `PASS`, `WARNING`, `FAIL`, `SKIPPED`, or `ERROR`. Kubernetes API
 failures are reported as `ERROR` instead of terminating the whole program as
 `bash -e` could do.
 
+The registry IDs in the table are the values accepted by the CLI's
+`--checks ID[,ID...]` option. Omitting `--checks` runs the complete registry;
+`--list-checks` prints the same IDs, scopes, and display names without loading a
+kubeconfig.
+
 | Original shell function | Registry ID | Go implementation | Execution location |
 | --- | --- | --- | --- |
 | `check_certs` | `certificates` | `checkCertificates`, `localCertificates` | Validator pods on every control-plane node |
@@ -31,6 +36,8 @@ failures are reported as `ERROR` instead of terminating the whole program as
 | `check_backup_target` | `backup-target` | `checkBackupTarget` | Kubernetes API |
 | `check_storage_network_ip_availability` | `storage-network-ip` | `checkStorageNetworkIPs` | Kubernetes API |
 | `check_rwx_network_ip_availability` | `rwx-network-ip` | `checkRWXNetworkIPs` | Kubernetes API |
+| `check_network_config` | `network-config` | `checkNetworkConfigNodes`, `localNetworkConfig` | Validator pods on every node (v1.6) |
+| `check_cos_state_partition_size` | `cos-state-size` | `checkCOSStateNodes`, `localCOSStateSize` | Validator pods on every node (v1.7) |
 
 ## Check implementations
 

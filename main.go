@@ -32,6 +32,21 @@ type options struct {
 	timeout        time.Duration
 	validatorImage string
 	output         string
+	checks         checkSelectionFlag
+	listChecks     bool
+}
+
+type checkSelectionFlag struct {
+	value string
+	set   bool
+}
+
+func (f *checkSelectionFlag) String() string { return f.value }
+
+func (f *checkSelectionFlag) Set(value string) error {
+	f.value = value
+	f.set = true
+	return nil
 }
 
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
@@ -62,6 +77,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags.DurationVar(&opts.timeout, "timeout", 5*time.Minute, "timeout for each node validator")
 	flags.StringVar(&opts.validatorImage, "validator-image", defaultValidatorImage, "node validator image")
 	flags.StringVar(&opts.output, "output", "text", "report format: text or json")
+	flags.Var(&opts.checks, "checks", "comma-separated check IDs to run (default: all)")
+	flags.BoolVar(&opts.listChecks, "list-checks", false, "list available checks without contacting Kubernetes")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: harvester-precheck [options]")
 		flags.PrintDefaults()
@@ -78,6 +95,29 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if opts.output != "text" && opts.output != "json" {
 		fmt.Fprintln(stderr, "--output must be text or json")
+		return 2
+	}
+	if opts.listChecks && opts.checks.set {
+		fmt.Fprintln(stderr, "--checks cannot be combined with --list-checks")
+		return 2
+	}
+	if opts.listChecks {
+		if err := precheck.WriteCheckList(stdout, precheck.ListChecks(), opts.output); err != nil {
+			fmt.Fprintf(stderr, "write check list: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
+	var selected []precheck.Check
+	var err error
+	if opts.checks.set {
+		selected, err = precheck.SelectChecks(strings.Split(opts.checks.value, ","))
+	} else {
+		selected, err = precheck.SelectChecks(nil)
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "invalid check selection: %v\n", err)
 		return 2
 	}
 	if opts.timeout <= 0 {
@@ -145,7 +185,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	env.Version = version
 	env.Verbose("starting checks for cluster %s", version.Raw)
-	report := precheck.Run(ctx, env)
+	report := precheck.Run(ctx, env, selected)
 	if err := precheck.WriteReport(reportWriter, report, opts.output); err != nil {
 		fmt.Fprintf(stderr, "write report: %v\n", err)
 		return 1
