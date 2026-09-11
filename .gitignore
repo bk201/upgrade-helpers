@@ -1,1 +1,3 @@
 .idea/
+/harvester-precheck
+/kubeconfig
